@@ -30,7 +30,7 @@ const int maxPage = 4;
 int currentPage = 0;
 int nextPage = 1;
 
-char displayTime[] = "no time";
+String displayTime = "no time";
 
 // a "tm" structure is used to decompose a seconds
 // value into its component parts (year, month, day, etc)
@@ -67,6 +67,7 @@ void ledsOFF()
   digitalWrite(YELLOW, LOW);
   digitalWrite(GREEN, LOW);
 }
+
 void ledsON()
 {
   digitalWrite(RED, HIGH);
@@ -101,7 +102,7 @@ void setup_wifi()
   digitalWrite(RED, HIGH);
 
   // We start by connecting to a WiFi network
-  Serial.println();
+
   Serial.print("Connecting to ");
   Serial.println(ssid);
 
@@ -176,28 +177,16 @@ void reconnect()
 
 bool showPage(int reqPage)
 {
-  int intHour = 0;
-  int intMin = 0;
-  int intSec = 0;
+  String t = (String)timeinfo.tm_hour + ":" + (String)timeinfo.tm_min;
 
-  char displayTime[6] = "00:00";
-
-  intHour = timeinfo.tm_hour;
-  intMin = timeinfo.tm_min;
-
-  Serial.println(intHour);
-  Serial.println(intMin);
-
-  strcpy(displayTime, (char *)intHour);
-
-  Serial.println("displayTime");
-  Serial.println((char *)displayTime);
+  Serial.println("t");
+  Serial.println(t);
 
   if (reqPage == 1)
   {
 
     printToLCD("Running", 0, 0, 1);
-    printToLCD((char *)displayTime, 0, 9, 0);
+    printToLCD((char *)t.c_str(), 0, 9, 0);
     printToLCD("1", 0, 19, 0);
     printToLCD(blankLCDLine, 3, 0, 0);
     printToLCD(displayPrice, 3, 0, 0);
@@ -367,10 +356,7 @@ void setup()
 
 void loop()
 {
-
   getTime();
-
-  // delay(1000);  //wait for 1 sec
 
   if (!client.connected())
   {
@@ -380,14 +366,4 @@ void loop()
 
   if (nextPage != currentPage)
     showPage(nextPage);
-
-  // unsigned long now = millis();
-  // if (now - lastMsg > (1 * 60 * 1000)) {
-  //   lastMsg = now;
-  //   ++value;
-  //   snprintf(msg, MSG_BUFFER_SIZE, "hello world #%ld", value);
-  //   Serial.print("Publish message: ");
-  //   Serial.println(msg);
-  // client.publish("outTopic", msg);
-  //}
 }
