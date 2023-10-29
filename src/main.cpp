@@ -4,6 +4,7 @@
 #include <LiquidCrystal_I2C.h>
 #include <NodeRedTime.h>
 
+// ------------------------------------------------------------------
 // set the LCD number of columns and rows
 const int lcdColumns = 20;
 const int lcdRows = 4;
@@ -58,75 +59,41 @@ char *lcdLine;
 char displayPrice[] = "00.00";
 float price = atof((char *)displayPrice);
 
-void setup()
+// ------------------------------------------------------------------------------
+
+void ledsOFF()
 {
-  pinMode(YELLOW, OUTPUT);
-  pinMode(RED, OUTPUT);
-  pinMode(GREEN, OUTPUT);
-  pinMode(BUILTIN_LED, OUTPUT); // Initialize the BUILTIN_LED pin as an output
-
-  Serial.begin(115200);
-  delay(1000);
-
-  // inform time.h of the rules for local time conversion
-  setenv("TZ", TZ_INFO, 1);
-
-  initLCD();
-
-  initLEDS(5, 100);
-
-  Serial.println("Start setup... ");
-
-  lcdLine = "Start...";
-  printToLCD(lcdLine, 0, 0, 1);
-
-  // printToLCD((char *)ntpClient.getUnixTime(),2,0,0);
-  delay(3000);
-
-  setup_wifi();
-
-  client.setServer(mqtt_server, 1883);
-  client.setCallback(callback);
-
-  if (!client.connected())
-  {
-    reconnect();
-  }
-
-  Serial.println("End setup... ");
-
-  ledsON();
-  delay(1000);
-  ledsOFF();
-
-  digitalWrite(BUILTIN_LED, HIGH);
+  digitalWrite(RED, LOW);
+  digitalWrite(YELLOW, LOW);
+  digitalWrite(GREEN, LOW);
+}
+void ledsON()
+{
+  digitalWrite(RED, HIGH);
+  digitalWrite(YELLOW, HIGH);
+  digitalWrite(GREEN, HIGH);
 }
 
-void loop()
+void priceReceived(float price)
 {
+  Serial.print("Price received = ");
+  Serial.println(price);
+}
 
-  getTime();
+void initLCD()
+{
+  lcd.init();
+  lcd.backlight();
+  lcd.clear();
+}
 
-  // delay(1000);  //wait for 1 sec
+void printToLCD(char *text, int row, int column, bool clear)
+{
+  if (clear)
+    lcd.clear();
 
-  if (!client.connected())
-  {
-    reconnect();
-  }
-  client.loop();
-
-  if (nextPage != currentPage)
-    showPage(nextPage);
-
-  // unsigned long now = millis();
-  // if (now - lastMsg > (1 * 60 * 1000)) {
-  //   lastMsg = now;
-  //   ++value;
-  //   snprintf(msg, MSG_BUFFER_SIZE, "hello world #%ld", value);
-  //   Serial.print("Publish message: ");
-  //   Serial.println(msg);
-  // client.publish("outTopic", msg);
-  //}
+  lcd.setCursor(column, row);
+  lcd.print(text);
 }
 
 void setup_wifi()
@@ -207,125 +174,6 @@ void reconnect()
   }
 }
 
-void callback(char *topic, byte *payload, unsigned int length)
-{
-
-  payload[length] = '\0';
-
-  price = atof((char *)payload);
-  dtostrf(price, 4, 2, displayPrice);
-
-  Serial.print("Converted price: ");
-  Serial.println(price);
-
-  Serial.print("Message arrived [");
-  Serial.print(topic);
-  Serial.print("] ");
-
-  Serial.print(displayPrice);
-
-  Serial.println();
-
-  // Switch on appropriate LED
-  //
-  // RED >= 25
-  // YELLOW >= 15 AND < 25
-  // GREEN < 15
-  //
-  initLEDS(60, 20);
-  setLEDColour();
-  showPage(1);
-}
-
-void initLEDS(int count, int gap)
-{
-
-  while (count > 0)
-  {
-    ledsON();
-    delay(gap);
-    ledsOFF();
-    delay(gap);
-    --count;
-  }
-}
-
-void ledsOFF()
-{
-  digitalWrite(RED, LOW);
-  digitalWrite(YELLOW, LOW);
-  digitalWrite(GREEN, LOW);
-}
-void ledsON()
-{
-  digitalWrite(RED, HIGH);
-  digitalWrite(YELLOW, HIGH);
-  digitalWrite(GREEN, HIGH);
-}
-
-void priceReceived(float price)
-{
-  Serial.print("Price received = ");
-  Serial.println(price);
-}
-
-void initLCD()
-{
-  lcd.init();
-  lcd.backlight();
-  lcd.clear();
-}
-
-void printToLCD(char *text, int row, int column, bool clear)
-{
-  if (clear)
-    lcd.clear();
-
-  lcd.setCursor(column, row);
-  lcd.print(text);
-}
-
-void getTime()
-{
-
-  Serial.println("getting time...");
-
-  // fetch wallclock time as a seconds value
-  bool success = nodeRedTime.serverTime(&epochTime);
-
-  // could time be obtained?
-  if (success)
-  {
-
-    // if you want your local time, use localtime_r()
-    if (localtime_r(&epochTime, &timeinfo))
-    {
-
-      // display in human-readable form
-      Serial.printf("local time: %s", asctime(&timeinfo));
-    }
-
-    // // if you want UTC aka GMT, use gmtime_r()
-    // if (gmtime_r(&epochTime, &timeinfo)) {
-
-    //   // display in human-readable form
-    //   Serial.printf("UTC: %s", asctime(&timeinfo));
-    // }
-  }
-}
-
-void selectNextPage(int reqPage)
-{
-  if (reqPage == 0)
-  {
-    if (currentPage == maxPage)
-      reqPage = 1;
-    else
-      reqPage = currentPage + 1;
-  }
-  nextPage = reqPage;
-}
-
 bool showPage(int reqPage)
 {
   int intHour = 0;
@@ -388,4 +236,158 @@ void setLEDColour()
     ledsON();
     strcpy(colour, "GRN/YEL/RED");
   }
+}
+
+void initLEDS(int count, int gap)
+{
+
+  while (count > 0)
+  {
+    ledsON();
+    delay(gap);
+    ledsOFF();
+    delay(gap);
+    --count;
+  }
+}
+
+void callback(char *topic, byte *payload, unsigned int length)
+{
+
+  payload[length] = '\0';
+
+  price = atof((char *)payload);
+  dtostrf(price, 4, 2, displayPrice);
+
+  Serial.print("Converted price: ");
+  Serial.println(price);
+
+  Serial.print("Message arrived [");
+  Serial.print(topic);
+  Serial.print("] ");
+
+  Serial.print(displayPrice);
+
+  Serial.println();
+
+  // Switch on appropriate LED
+  //
+  // RED >= 25
+  // YELLOW >= 15 AND < 25
+  // GREEN < 15
+  //
+  initLEDS(60, 20);
+  setLEDColour();
+  showPage(1);
+}
+
+void getTime()
+{
+  Serial.println("getting time...");
+
+  // fetch wallclock time as a seconds value
+  bool success = nodeRedTime.serverTime(&epochTime);
+
+  // could time be obtained?
+  if (success)
+  {
+
+    // if you want your local time, use localtime_r()
+    if (localtime_r(&epochTime, &timeinfo))
+    {
+
+      // display in human-readable form
+      Serial.printf("local time: %s", asctime(&timeinfo));
+    }
+
+    // // if you want UTC aka GMT, use gmtime_r()
+    // if (gmtime_r(&epochTime, &timeinfo)) {
+
+    //   // display in human-readable form
+    //   Serial.printf("UTC: %s", asctime(&timeinfo));
+    // }
+  }
+}
+
+void selectNextPage(int reqPage)
+{
+  if (reqPage == 0)
+  {
+    if (currentPage == maxPage)
+      reqPage = 1;
+    else
+      reqPage = currentPage + 1;
+  }
+  nextPage = reqPage;
+}
+
+void setup()
+{
+  pinMode(YELLOW, OUTPUT);
+  pinMode(RED, OUTPUT);
+  pinMode(GREEN, OUTPUT);
+  pinMode(BUILTIN_LED, OUTPUT); // Initialize the BUILTIN_LED pin as an output
+
+  Serial.begin(115200);
+  delay(1000);
+
+  // inform time.h of the rules for local time conversion
+  setenv("TZ", TZ_INFO, 1);
+
+  initLCD();
+
+  initLEDS(5, 100);
+
+  Serial.println("Start setup... ");
+
+  lcdLine = "Start...";
+  printToLCD(lcdLine, 0, 0, 1);
+
+  // printToLCD((char *)ntpClient.getUnixTime(),2,0,0);
+  delay(3000);
+
+  setup_wifi();
+
+  client.setServer(mqtt_server, 1883);
+  client.setCallback(callback);
+
+  if (!client.connected())
+  {
+    reconnect();
+  }
+
+  Serial.println("End setup... ");
+
+  ledsON();
+  delay(1000);
+  ledsOFF();
+
+  digitalWrite(BUILTIN_LED, HIGH);
+}
+
+void loop()
+{
+
+  getTime();
+
+  // delay(1000);  //wait for 1 sec
+
+  if (!client.connected())
+  {
+    reconnect();
+  }
+  client.loop();
+
+  if (nextPage != currentPage)
+    showPage(nextPage);
+
+  // unsigned long now = millis();
+  // if (now - lastMsg > (1 * 60 * 1000)) {
+  //   lastMsg = now;
+  //   ++value;
+  //   snprintf(msg, MSG_BUFFER_SIZE, "hello world #%ld", value);
+  //   Serial.print("Publish message: ");
+  //   Serial.println(msg);
+  // client.publish("outTopic", msg);
+  //}
 }
