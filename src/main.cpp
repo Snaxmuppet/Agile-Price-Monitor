@@ -177,16 +177,11 @@ void reconnect()
 
 bool showPage(int reqPage)
 {
-  String t = (String)timeinfo.tm_hour + ":" + (String)timeinfo.tm_min;
-
-  Serial.println("t");
-  Serial.println(t);
-
   if (reqPage == 1)
   {
 
     printToLCD("Running", 0, 0, 1);
-    printToLCD((char *)t.c_str(), 0, 9, 0);
+    printToLCD((char *)displayTime.c_str(), 0, 9, 0);
     printToLCD("1", 0, 19, 0);
     printToLCD(blankLCDLine, 3, 0, 0);
     printToLCD(displayPrice, 3, 0, 0);
@@ -295,6 +290,14 @@ void getTime()
     //   // display in human-readable form
     //   Serial.printf("UTC: %s", asctime(&timeinfo));
     // }
+
+    // refresh time
+    displayTime = (String)timeinfo.tm_hour + ":" + (String)timeinfo.tm_min;
+
+    Serial.println("displayTime:");
+    Serial.println(displayTime);
+
+    printToLCD((char *)displayTime.c_str(), 0, 9, 0);
   }
 }
 
@@ -366,4 +369,6 @@ void loop()
 
   if (nextPage != currentPage)
     showPage(nextPage);
+
+  delay(6000);
 }
