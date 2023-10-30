@@ -59,6 +59,9 @@ char *lcdLine;
 char displayPrice[] = "00.00";
 float price = atof((char *)displayPrice);
 
+String sHour = "hh";
+String sMin = "mm";
+
 // ------------------------------------------------------------------------------
 
 void ledsOFF()
@@ -292,7 +295,15 @@ void getTime()
     // }
 
     // refresh time
-    displayTime = (String)timeinfo.tm_hour + ":" + (String)timeinfo.tm_min;
+    sHour = (String)timeinfo.tm_hour;
+    sMin = (String)timeinfo.tm_min;
+
+    if (sHour.length() == 1)
+      sHour = "0" + sHour;
+    if (sMin.length() == 1)
+      sMin = "0" + sMin;
+
+    displayTime = sHour + ":" + sMin;
 
     Serial.println("displayTime:");
     Serial.println(displayTime);
