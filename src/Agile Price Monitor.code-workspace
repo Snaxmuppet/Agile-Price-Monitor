@@ -1,8 +1,20 @@
 {
-	"folders": [
-		{
-			"path": ".."
-		}
-	],
-	"settings": {}
+  "folders": [
+	{
+		"path": "../.."
+	},
+	{
+		"name": "Agile-Price-Monitor",
+		"path": ".."
+	},
+	{
+		"name": "I2C Scanner",
+		"path": "../../../PlatformIO/Projects/I2C Scanner"
+	},
+	{
+		"name": "OTA Updates",
+		"path": "../../../PlatformIO/Projects/OTA Updates"
+	}
+],
+  "settings": {}
 }

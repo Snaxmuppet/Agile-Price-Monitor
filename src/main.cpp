@@ -336,7 +336,7 @@ void setup()
   pinMode(YELLOW, OUTPUT);
   pinMode(RED, OUTPUT);
   pinMode(GREEN, OUTPUT);
-  pinMode(BUILTIN_LED, OUTPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
   // pinMode(SCRSELECTBUTTON, INPUT);
 
   Serial.begin(115200);
@@ -375,7 +375,7 @@ void setup()
   delay(1000);
   ledsOFF();
 
-  digitalWrite(BUILTIN_LED, HIGH);
+  digitalWrite(BUILTIN_LED, LOW);
 }
 
 void loop()
