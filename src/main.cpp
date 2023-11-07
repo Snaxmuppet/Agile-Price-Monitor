@@ -1,36 +1,43 @@
-#include <ESP8266WiFi.h>
+#include <arduino.h>
+#include <WiFi.h>
 #include <PubSubClient.h>
 #include <WiFiUdp.h>
 #include <LiquidCrystal_I2C.h>
 #include <NodeRedTime.h>
 
 // ------------------------------------------------------------------
-// set the LCD number of columns and rows
-const int lcdColumns = 20;
-const int lcdRows = 4;
+// Defines
 
-const int GREEN = 14;
-const int YELLOW = 12;
-const int RED = 13;
+#define LCDCOLUMNS 20
+#define LCDROWS 4
 
-const char *strRED = "RED";
-const char *strYELLOW = "YELLOW";
-const char *strGREEN = "GREEN";
-char *colour = "colour";
+#define GREEN 19
+#define YELLOW 18
+#define RED 17
 
-char *blankLCDLine = "                    ";
+#define strRED "RED"
+#define strYELLOW "YELLOW"
+#define strGREEN "GREEN"
+
+#define SCRSELECTBUTTON 10
+
+#define BLANKLCDLINE "                    "
 
 // const char* ssid = "SnaxNet-IoT";
 // const char* password = "6yorkroad-iot";
-const char *ssid = "SnaxNet";
-const char *password = "snaxmuppet4481";
-const char *mqtt_server = "192.168.1.45";
 
-const int maxPage = 4;
+#define MAXPAGE 4
+
+#define MSG_BUFFER_SIZE (50)
+
+// ---------------------------------------------------------------
+// Global Variables
+
+char colour[11] = "colour";
 int currentPage = 0;
 int nextPage = 1;
 
-String displayTime = "no time";
+char displayTime[6] = "00:00";
 
 // a "tm" structure is used to decompose a seconds
 // value into its component parts (year, month, day, etc)
@@ -40,29 +47,34 @@ tm timeinfo;
 time_t epochTime;
 
 // set LCD address, number of columns and rows
-LiquidCrystal_I2C lcd(0x3F, lcdColumns, lcdRows);
+LiquidCrystal_I2C lcd(0x3F, LCDCOLUMNS, LCDROWS);
 
-WiFiUDP udp;
-
+// Node Red Time
 NodeRedTime nodeRedTime("http://192.168.1.45:1880/time/");
 const char *TZ_INFO = "GMT0BST,M3.5.0/1,M10.5.0";
 
+WiFiUDP udp;
 WiFiClient espClient;
 PubSubClient client(espClient);
 
+const char *SSID = "SnaxNet";
+const char *PASSWORD = "snaxmuppet4481";
+const char *MQTTSERVER = "192.168.1.45";
+
 unsigned long lastMsg = 0;
-#define MSG_BUFFER_SIZE (50)
+
 char msg[MSG_BUFFER_SIZE];
 int value = 0;
-char *lcdLine;
+char lcdLine[20];
 
 char displayPrice[] = "00.00";
 float price = atof((char *)displayPrice);
 
-String sHour = "hh";
-String sMin = "mm";
+char sHour[3] = "hh";
+char sMin[3] = "mm";
 
 // ------------------------------------------------------------------------------
+//
 
 void ledsOFF()
 {
@@ -102,19 +114,22 @@ void printToLCD(char *text, int row, int column, bool clear)
 
 void setup_wifi()
 {
+  delay(100);
   digitalWrite(RED, HIGH);
 
   // We start by connecting to a WiFi network
 
   Serial.print("Connecting to ");
-  Serial.println(ssid);
+  Serial.println(SSID);
 
-  strcpy(lcdLine, ssid);
+  strcpy(lcdLine, (char *)SSID);
   printToLCD("Wifi...", 0, 0, 1);
-  printToLCD(lcdLine, 1, 0, 0);
+  printToLCD((char *)SSID, 1, 0, 0);
 
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
+  delay(1000);
+
+  WiFi.disconnect();
+  WiFi.begin(SSID, PASSWORD);
 
   while (WiFi.status() != WL_CONNECTED)
   {
@@ -129,10 +144,11 @@ void setup_wifi()
 
   Serial.println("");
   Serial.println("WiFi connected");
-  Serial.println("IP address: ");
+  Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
-
   printToLCD("Good", 2, 0, 0);
+
+  delay(2000);
 }
 
 void reconnect()
@@ -146,14 +162,14 @@ void reconnect()
   {
     digitalWrite(YELLOW, LOW);
     delay(500);
-    Serial.print("Attempting MQTT connection...");
+    Serial.println("Attempting MQTT connection...");
 
     printToLCD("MQTT...", 0, 0, 1);
     delay(1000);
 
     // Create a random client ID
-    String clientId = "ESP8266Client";
-    // clientId += String(random(0xffff), HEX);
+    String clientId = "ESP32AgilePriceMonitor";
+
     //  Attempt to connect
     if (client.connect(clientId.c_str()))
     {
@@ -161,9 +177,10 @@ void reconnect()
       printToLCD("Good", 1, 0, 0);
       delay(1000);
 
-      // Once connected, publish an announcement...
-      // client.publish("outTopic", "hello world");
-      // ... and resubscribe
+      Serial.print("Subscribing to: ");
+      Serial.println(clientId);
+      delay(1000);
+
       client.subscribe("agile/currentPeriodPrice");
     }
     else
@@ -184,9 +201,9 @@ bool showPage(int reqPage)
   {
 
     printToLCD("Running", 0, 0, 1);
-    printToLCD((char *)displayTime.c_str(), 0, 9, 0);
+    printToLCD((char *)displayTime, 0, 9, 0);
     printToLCD("1", 0, 19, 0);
-    printToLCD(blankLCDLine, 3, 0, 0);
+    printToLCD(BLANKLCDLINE, 3, 0, 0);
     printToLCD(displayPrice, 3, 0, 0);
     printToLCD(colour, 3, 6, 0);
   }
@@ -257,12 +274,6 @@ void callback(char *topic, byte *payload, unsigned int length)
 
   Serial.println();
 
-  // Switch on appropriate LED
-  //
-  // RED >= 25
-  // YELLOW >= 15 AND < 25
-  // GREEN < 15
-  //
   initLEDS(60, 20);
   setLEDColour();
   showPage(1);
@@ -294,21 +305,17 @@ void getTime()
     //   Serial.printf("UTC: %s", asctime(&timeinfo));
     // }
 
-    // refresh time
-    sHour = (String)timeinfo.tm_hour;
-    sMin = (String)timeinfo.tm_min;
+    strftime(sHour, 3, "%H", &timeinfo);
+    strftime(sMin, 3, "%M", &timeinfo);
 
-    if (sHour.length() == 1)
-      sHour = "0" + sHour;
-    if (sMin.length() == 1)
-      sMin = "0" + sMin;
+    strcpy(displayTime, sHour);
+    strcat(displayTime, ":");
+    strcat(displayTime, sMin);
 
-    displayTime = sHour + ":" + sMin;
-
-    Serial.println("displayTime:");
+    Serial.print("displayTime: ");
     Serial.println(displayTime);
 
-    printToLCD((char *)displayTime.c_str(), 0, 9, 0);
+    printToLCD((char *)displayTime, 0, 9, 0);
   }
 }
 
@@ -316,7 +323,7 @@ void selectNextPage(int reqPage)
 {
   if (reqPage == 0)
   {
-    if (currentPage == maxPage)
+    if (currentPage == MAXPAGE)
       reqPage = 1;
     else
       reqPage = currentPage + 1;
@@ -329,9 +336,11 @@ void setup()
   pinMode(YELLOW, OUTPUT);
   pinMode(RED, OUTPUT);
   pinMode(GREEN, OUTPUT);
-  pinMode(BUILTIN_LED, OUTPUT); // Initialize the BUILTIN_LED pin as an output
+  pinMode(BUILTIN_LED, OUTPUT);
+  // pinMode(SCRSELECTBUTTON, INPUT);
 
   Serial.begin(115200);
+
   delay(1000);
 
   // inform time.h of the rules for local time conversion
@@ -343,7 +352,7 @@ void setup()
 
   Serial.println("Start setup... ");
 
-  lcdLine = "Start...";
+  strcpy(lcdLine, "Start...");
   printToLCD(lcdLine, 0, 0, 1);
 
   // printToLCD((char *)ntpClient.getUnixTime(),2,0,0);
@@ -351,8 +360,9 @@ void setup()
 
   setup_wifi();
 
-  client.setServer(mqtt_server, 1883);
+  client.setServer(MQTTSERVER, 1883);
   client.setCallback(callback);
+  client.setKeepAlive(90);
 
   if (!client.connected())
   {
@@ -372,6 +382,10 @@ void loop()
 {
   getTime();
 
+  Serial.print("connected status: ");
+  Serial.println(client.connected());
+  delay(2000);
+
   if (!client.connected())
   {
     reconnect();
@@ -381,5 +395,5 @@ void loop()
   if (nextPage != currentPage)
     showPage(nextPage);
 
-  delay(6000);
+  delay(10000);
 }
