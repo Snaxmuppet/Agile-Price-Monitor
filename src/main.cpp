@@ -33,7 +33,7 @@
 // ---------------------------------------------------------------
 // Global Variables
 
-char colour[11] = "colour";
+char colour[15] = "- No  Colour -";
 int currentPage = 0;
 int nextPage = 1;
 
@@ -65,7 +65,7 @@ unsigned long lastMsg = 0;
 
 char msg[MSG_BUFFER_SIZE];
 int value = 0;
-char lcdLine[20];
+char lcdLine[21];
 
 char displayPrice[] = "00.00";
 float price = atof((char *)displayPrice);
