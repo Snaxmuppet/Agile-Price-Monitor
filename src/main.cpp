@@ -23,9 +23,6 @@
 
 #define BLANKLCDLINE "                    "
 
-// const char* ssid = "SnaxNet-IoT";
-// const char* password = "6yorkroad-iot";
-
 #define MAXPAGE 4
 
 #define MSG_BUFFER_SIZE (50)
@@ -57,9 +54,14 @@ WiFiUDP udp;
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-const char *SSID = "SnaxNet";
-const char *PASSWORD = "snaxmuppet4481";
+// const char *SSID = "SnaxNet";
+// const char *PASSWORD = "snaxmuppet4481";
+
+const char *SSID = "SnaxNet-IoT";
+const char *PASSWORD = "6yorkroad-iot";
+
 const char *MQTTSERVER = "192.168.1.45";
+const char *clientId = "ESP32AgilePriceMonitor";
 
 unsigned long lastMsg = 0;
 
@@ -167,11 +169,8 @@ void reconnect()
     printToLCD("MQTT...", 0, 0, 1);
     delay(1000);
 
-    // Create a random client ID
-    String clientId = "ESP32AgilePriceMonitor";
-
     //  Attempt to connect
-    if (client.connect(clientId.c_str()))
+    if (client.connect(clientId))
     {
       Serial.println("connected");
       printToLCD("Good", 1, 0, 0);
@@ -197,15 +196,26 @@ void reconnect()
 
 bool showPage(int reqPage)
 {
-  if (reqPage == 1)
+  switch (reqPage)
   {
-
+  case 1:
     printToLCD("Running", 0, 0, 1);
     printToLCD((char *)displayTime, 0, 9, 0);
     printToLCD("1", 0, 19, 0);
     printToLCD(BLANKLCDLINE, 3, 0, 0);
     printToLCD(displayPrice, 3, 0, 0);
     printToLCD(colour, 3, 6, 0);
+    break;
+
+  case 2:
+
+    printToLCD("Page 2   ", 0, 0, 1);
+    printToLCD((char *)displayTime, 0, 9, 0);
+    printToLCD("2", 0, 19, 0);
+    printToLCD(BLANKLCDLINE, 3, 0, 0);
+    printToLCD(displayPrice, 3, 0, 0);
+    printToLCD(colour, 3, 6, 0);
+    break;
   }
 
   currentPage = reqPage;
@@ -317,6 +327,11 @@ void getTime()
 
     printToLCD((char *)displayTime, 0, 9, 0);
   }
+  else
+  {
+    Serial.print("Getting time Failed... :");
+    Serial.println(success);
+  }
 }
 
 void selectNextPage(int reqPage)
@@ -329,6 +344,21 @@ void selectNextPage(int reqPage)
       reqPage = currentPage + 1;
   }
   nextPage = reqPage;
+}
+
+void setup_MQTT()
+{
+  delay(100);
+  digitalWrite(YELLOW, HIGH);
+
+  client.setServer(MQTTSERVER, 1883);
+  client.setCallback(callback);
+  client.setKeepAlive(90);
+
+  if (!client.connected())
+  {
+    reconnect();
+  }
 }
 
 void setup()
@@ -360,15 +390,7 @@ void setup()
 
   setup_wifi();
 
-  client.setServer(MQTTSERVER, 1883);
-  client.setCallback(callback);
-  client.setKeepAlive(90);
-
-  if (!client.connected())
-  {
-    reconnect();
-  }
-
+  setup_MQTT();
   Serial.println("End setup... ");
 
   ledsON();
@@ -384,7 +406,7 @@ void loop()
 
   Serial.print("connected status: ");
   Serial.println(client.connected());
-  delay(2000);
+  delay(100);
 
   if (!client.connected())
   {
@@ -393,7 +415,9 @@ void loop()
   client.loop();
 
   if (nextPage != currentPage)
+  {
     showPage(nextPage);
+  }
 
-  delay(10000);
+  delay(1000);
 }
