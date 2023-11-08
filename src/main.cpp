@@ -3,8 +3,8 @@
 #include <PubSubClient.h>
 #include <WiFiUdp.h>
 #include <LiquidCrystal_I2C.h>
-#include <NodeRedTime.h>
 #include <OneButton.h>
+#include <NTPClient.h>
 
 // ------------------------------------------------------------------
 // Defines
@@ -36,7 +36,8 @@ char colour[15] = "- No  Colour -";
 int currentPage = 0;
 int nextPage = 1;
 
-char displayTime[6] = "00:00";
+char *displayTime = "00:00:00";
+String strFormattedTime;
 
 // a "tm" structure is used to decompose a seconds
 // value into its component parts (year, month, day, etc)
@@ -48,11 +49,10 @@ time_t epochTime;
 // set LCD address, number of columns and rows
 LiquidCrystal_I2C lcd(0x3F, LCDCOLUMNS, LCDROWS);
 
-// Node Red Time
-NodeRedTime nodeRedTime("http://192.168.1.45:1880/time/");
 const char *TZ_INFO = "GMT0GMT,M3.5.0/1,M10.5.0";
 
 WiFiUDP udp;
+NTPClient timeClient(udp);
 WiFiClient espClient;
 PubSubClient client(espClient);
 
@@ -172,6 +172,7 @@ void reconnect()
   {
     digitalWrite(YELLOW, LOW);
     delay(500);
+
     Serial.println("Attempting MQTT connection...");
 
     printToLCD("MQTT...", 0, 0, 1);
@@ -196,9 +197,10 @@ void reconnect()
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
       // Wait 5 seconds before retrying
-      digitalWrite(YELLOW, HIGH);
-      delay(500);
     }
+
+    digitalWrite(YELLOW, HIGH);
+    delay(500);
   }
 }
 
@@ -208,7 +210,7 @@ void showPage(int reqPage)
   {
   case 1:
     printToLCD("Running", 0, 0, 1);
-    printToLCD((char *)displayTime, 0, 9, 0);
+    printToLCD(displayTime, 0, 9, 0);
     printToLCD("1", 0, 19, 0);
     printToLCD(BLANKLCDLINE, 3, 0, 0);
     printToLCD(displayPrice, 3, 0, 0);
@@ -218,7 +220,7 @@ void showPage(int reqPage)
   case 2:
 
     printToLCD("Page 2   ", 0, 0, 1);
-    printToLCD((char *)displayTime, 0, 9, 0);
+    printToLCD(displayTime, 0, 9, 0);
     printToLCD("2", 0, 19, 0);
     printToLCD(BLANKLCDLINE, 3, 0, 0);
     printToLCD(displayPrice, 3, 0, 0);
@@ -300,45 +302,28 @@ void getTime()
 {
   Serial.println("getting time...");
 
-  // fetch wallclock time as a seconds value
-  // bool success = nodeRedTime.serverTime(&epochTime);
-  bool success = false;
+  timeClient.update();
+
+  Serial.println(timeClient.getFormattedTime());
 
   // could time be obtained?
-  if (success)
+  if (timeClient.isTimeSet())
   {
 
-    // if you want your local time, use localtime_r()
-    if (localtime_r(&epochTime, &timeinfo))
-    {
-
-      // display in human-readable form
-      Serial.printf("local time: %s", asctime(&timeinfo));
-    }
-
-    // // if you want UTC aka GMT, use gmtime_r()
-    // if (gmtime_r(&epochTime, &timeinfo)) {
-
-    //   // display in human-readable form
-    //   Serial.printf("UTC: %s", asctime(&timeinfo));
-    // }
-
-    // strftime(sHour, 3, "%H", &timeinfo);
-    // strftime(sMin, 3, "%M", &timeinfo);
-
-    // strcpy(displayTime, sHour);
-    // strcat(displayTime, ":");
-    // strcat(displayTime, sMin);
+    strFormattedTime = timeClient.getFormattedTime();
 
     Serial.print("displayTime: ");
-    Serial.println(displayTime);
+    Serial.println(strFormattedTime.c_str());
 
-    printToLCD((char *)displayTime, 0, 9, 0);
+    printToLCD((char *)"22222222", 0, 9, 0);
+    //   lcd.clear();
+    // lcd.setCursor(9, 0);
+    // lcd.print((char*)strFormattedTime.c_str());
+    // delay(1000);
   }
   else
   {
     Serial.print("Getting time Failed... :");
-    Serial.println(success);
   }
 }
 
@@ -356,7 +341,6 @@ void selectNextPage(int reqPage)
 
 void setup_MQTT()
 {
-  delay(100);
   digitalWrite(YELLOW, HIGH);
 
   client.setServer(MQTTSERVER, 1883);
@@ -414,6 +398,10 @@ void setup()
   setup_wifi();
   setup_MQTT();
   setup_button();
+
+  timeClient.begin();
+  delay(100);
+  // timeClient.update();
 
   Serial.println("End setup... ");
 
