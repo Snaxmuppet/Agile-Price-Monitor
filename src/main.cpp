@@ -5,6 +5,7 @@
 #include <LiquidCrystal_I2C.h>
 #include <OneButton.h>
 #include <NTPClient.h>
+#include <Wire.h>
 
 // ------------------------------------------------------------------
 // Defines
@@ -16,9 +17,11 @@
 #define YELLOW 18
 #define RED 17
 
-#define strRED "RED"
-#define strYELLOW "YELLOW"
-#define strGREEN "GREEN"
+#define strRED "RED           "
+#define strYELLOW "YELLOW        "
+#define strGREEN "GREEN         "
+#define strGreenYellow "GREEN/YELLOW  "
+#define strGreenYellowRed "GRN/YEL/RED   "
 
 #define scrButton 15
 #define pressed HIGH
@@ -36,18 +39,11 @@ char colour[15] = "- No  Colour -";
 int currentPage = 0;
 int nextPage = 1;
 
-char *displayTime = "00:00:00";
-String strFormattedTime;
-
-// a "tm" structure is used to decompose a seconds
-// value into its component parts (year, month, day, etc)
-tm timeinfo;
-
-// a variable to hold the seconds value
-time_t epochTime;
-
 // set LCD address, number of columns and rows
 LiquidCrystal_I2C lcd(0x3F, LCDCOLUMNS, LCDROWS);
+
+// // set LCD address, number of columns and rows
+// LiquidCrystal_I2C lcd(0x3F, LCDCOLUMNS, LCDROWS);
 
 const char *TZ_INFO = "GMT0GMT,M3.5.0/1,M10.5.0";
 
@@ -75,9 +71,6 @@ char lcdLine[21];
 
 char displayPrice[] = "00.00";
 float price = atof((char *)displayPrice);
-
-char sHour[3] = "hh";
-char sMin[3] = "mm";
 
 // ------------------------------------------------------------------------------
 //
@@ -107,6 +100,8 @@ void initLCD()
   lcd.init();
   lcd.backlight();
   lcd.clear();
+
+  Wire.setClock(10000);
 }
 
 void printToLCD(char *text, int row, int column, bool clear)
@@ -161,6 +156,31 @@ void setup_wifi()
   delay(2000);
 }
 
+void showPage(int reqPage)
+{
+  switch (reqPage)
+  {
+  case 1:
+    printToLCD("Running", 0, 0, 1);
+    printToLCD("1", 0, 19, 0);
+    printToLCD(BLANKLCDLINE, 3, 0, 0);
+    printToLCD(displayPrice, 3, 0, 0);
+    printToLCD(colour, 3, 6, 0);
+    break;
+
+  case 2:
+
+    printToLCD("Page 2   ", 0, 0, 1);
+    printToLCD("2", 0, 19, 0);
+    printToLCD(BLANKLCDLINE, 3, 0, 0);
+    printToLCD(displayPrice, 3, 0, 0);
+    printToLCD(colour, 3, 6, 0);
+    break;
+  }
+
+  currentPage = reqPage;
+}
+
 void reconnect()
 {
   digitalWrite(YELLOW, HIGH);
@@ -201,34 +221,8 @@ void reconnect()
 
     digitalWrite(YELLOW, HIGH);
     delay(500);
+    showPage(currentPage);
   }
-}
-
-void showPage(int reqPage)
-{
-  switch (reqPage)
-  {
-  case 1:
-    printToLCD("Running", 0, 0, 1);
-    printToLCD(displayTime, 0, 9, 0);
-    printToLCD("1", 0, 19, 0);
-    printToLCD(BLANKLCDLINE, 3, 0, 0);
-    printToLCD(displayPrice, 3, 0, 0);
-    printToLCD(colour, 3, 6, 0);
-    break;
-
-  case 2:
-
-    printToLCD("Page 2   ", 0, 0, 1);
-    printToLCD(displayTime, 0, 9, 0);
-    printToLCD("2", 0, 19, 0);
-    printToLCD(BLANKLCDLINE, 3, 0, 0);
-    printToLCD(displayPrice, 3, 0, 0);
-    printToLCD(colour, 3, 6, 0);
-    break;
-  }
-
-  currentPage = reqPage;
 }
 
 void setLEDColour()
@@ -236,28 +230,28 @@ void setLEDColour()
   if (price >= 25)
   {
     digitalWrite(RED, HIGH);
-    strcpy(colour, "RED");
+    strcpy(colour, strRED);
   }
   else if (price >= 20)
   {
     digitalWrite(YELLOW, HIGH);
-    strcpy(colour, "YELLOW");
+    strcpy(colour, strYELLOW);
   }
   else if (price >= 10)
   {
     digitalWrite(GREEN, HIGH);
-    strcpy(colour, "GREEN");
+    strcpy(colour, strGREEN);
   }
   else if (price >= 0)
   {
     digitalWrite(GREEN, HIGH);
     digitalWrite(YELLOW, HIGH);
-    strcpy(colour, "GREEN/YELLOW");
+    strcpy(colour, strGreenYellow);
   }
   else
   {
     ledsON();
-    strcpy(colour, "GRN/YEL/RED");
+    strcpy(colour, strGreenYellowRed);
   }
 }
 
@@ -295,36 +289,9 @@ void callback(char *topic, byte *payload, unsigned int length)
 
   initLEDS(60, 20);
   setLEDColour();
-  showPage(1);
-}
 
-void getTime()
-{
-  Serial.println("getting time...");
-
-  timeClient.update();
-
-  Serial.println(timeClient.getFormattedTime());
-
-  // could time be obtained?
-  if (timeClient.isTimeSet())
-  {
-
-    strFormattedTime = timeClient.getFormattedTime();
-
-    Serial.print("displayTime: ");
-    Serial.println(strFormattedTime.c_str());
-
-    printToLCD((char *)"22222222", 0, 9, 0);
-    //   lcd.clear();
-    // lcd.setCursor(9, 0);
-    // lcd.print((char*)strFormattedTime.c_str());
-    // delay(1000);
-  }
-  else
-  {
-    Serial.print("Getting time Failed... :");
-  }
+  printToLCD(displayPrice, 3, 0, 0);
+  printToLCD(colour, 3, 6, 0);
 }
 
 void selectNextPage(int reqPage)
@@ -380,9 +347,6 @@ void setup()
 
   delay(1000);
 
-  // inform time.h of the rules for local time conversion
-  setenv("TZ", TZ_INFO, 1);
-
   initLCD();
 
   initLEDS(5, 100);
@@ -392,16 +356,9 @@ void setup()
   strcpy(lcdLine, "Start...");
   printToLCD(lcdLine, 0, 0, 1);
 
-  // printToLCD((char *)ntpClient.getUnixTime(),2,0,0);
-  delay(3000);
-
   setup_wifi();
   setup_MQTT();
   setup_button();
-
-  timeClient.begin();
-  delay(100);
-  // timeClient.update();
 
   Serial.println("End setup... ");
 
@@ -415,8 +372,6 @@ void setup()
 
 void loop()
 {
-  getTime();
-
   Serial.print("connected status: ");
   Serial.println(client.connected());
 
