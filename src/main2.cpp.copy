@@ -4,6 +4,7 @@
 #include <WiFiUdp.h>
 #include <LiquidCrystal_I2C.h>
 #include <NodeRedTime.h>
+#include <OneButton.h>
 
 // ------------------------------------------------------------------
 // Defines
@@ -19,12 +20,10 @@
 #define strYELLOW "YELLOW"
 #define strGREEN "GREEN"
 
-#define SCRSELECTBUTTON 10
+#define scrButton 34
+#define pressed HIGH
 
 #define BLANKLCDLINE "                    "
-
-// const char* ssid = "SnaxNet-IoT";
-// const char* password = "6yorkroad-iot";
 
 #define MAXPAGE 4
 
@@ -33,7 +32,7 @@
 // ---------------------------------------------------------------
 // Global Variables
 
-char colour[11] = "colour";
+char colour[15] = "- No  Colour -";
 int currentPage = 0;
 int nextPage = 1;
 
@@ -57,15 +56,22 @@ WiFiUDP udp;
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-const char *SSID = "SnaxNet";
-const char *PASSWORD = "snaxmuppet4481";
+OneButton button(scrButton, true);
+
+// const char *SSID = "SnaxNet";
+// const char *PASSWORD = "snaxmuppet4481";
+
+const char *SSID = "SnaxNet-IoT";
+const char *PASSWORD = "6yorkroad-iot";
+
 const char *MQTTSERVER = "192.168.1.45";
+const char *clientId = "ESP32AgilePriceMonitor";
 
 unsigned long lastMsg = 0;
 
 char msg[MSG_BUFFER_SIZE];
 int value = 0;
-char lcdLine[20];
+char lcdLine[21];
 
 char displayPrice[] = "00.00";
 float price = atof((char *)displayPrice);
@@ -107,6 +113,10 @@ void printToLCD(char *text, int row, int column, bool clear)
 {
   if (clear)
     lcd.clear();
+
+Serial.print("Sending to LCD : >");
+Serial.print(text);
+Serial.println("<");
 
   lcd.setCursor(column, row);
   lcd.print(text);
@@ -167,11 +177,8 @@ void reconnect()
     printToLCD("MQTT...", 0, 0, 1);
     delay(1000);
 
-    // Create a random client ID
-    String clientId = "ESP32AgilePriceMonitor";
-
     //  Attempt to connect
-    if (client.connect(clientId.c_str()))
+    if (client.connect(clientId))
     {
       Serial.println("connected");
       printToLCD("Good", 1, 0, 0);
@@ -195,21 +202,31 @@ void reconnect()
   }
 }
 
-bool showPage(int reqPage)
+void showPage(int reqPage)
 {
-  if (reqPage == 1)
+  switch (reqPage)
   {
-
+  case 1:
     printToLCD("Running", 0, 0, 1);
     printToLCD((char *)displayTime, 0, 9, 0);
     printToLCD("1", 0, 19, 0);
     printToLCD(BLANKLCDLINE, 3, 0, 0);
     printToLCD(displayPrice, 3, 0, 0);
     printToLCD(colour, 3, 6, 0);
+    break;
+
+  case 2:
+
+    printToLCD("Page 2   ", 0, 0, 1);
+    printToLCD((char *)displayTime, 0, 9, 0);
+    printToLCD("2", 0, 19, 0);
+    printToLCD(BLANKLCDLINE, 3, 0, 0);
+    printToLCD(displayPrice, 3, 0, 0);
+    printToLCD(colour, 3, 6, 0);
+    break;
   }
 
   currentPage = reqPage;
-  return 1;
 }
 
 void setLEDColour()
@@ -317,6 +334,11 @@ void getTime()
 
     printToLCD((char *)displayTime, 0, 9, 0);
   }
+  else
+  {
+    Serial.print("Getting time Failed... :");
+    Serial.println(success);
+  }
 }
 
 void selectNextPage(int reqPage)
@@ -331,13 +353,43 @@ void selectNextPage(int reqPage)
   nextPage = reqPage;
 }
 
+void setup_MQTT()
+{
+  delay(100);
+  digitalWrite(YELLOW, HIGH);
+
+  client.setServer(MQTTSERVER, 1883);
+  client.setCallback(callback);
+  client.setKeepAlive(90);
+
+  if (!client.connected())
+  {
+    reconnect();
+  }
+  digitalWrite(YELLOW, HIGH);
+}
+
+void singleClick()
+{
+  Serial.println("Single Click");
+  delay(2000);
+
+  selectNextPage(0);
+}
+
+void setup_button()
+{
+  button.attachClick(singleClick);
+  // button.attachDoubleClick(doubleClick);
+  // button.attachLongPressStop(longClick);
+}
+
 void setup()
 {
   pinMode(YELLOW, OUTPUT);
   pinMode(RED, OUTPUT);
   pinMode(GREEN, OUTPUT);
-  pinMode(BUILTIN_LED, OUTPUT);
-  // pinMode(SCRSELECTBUTTON, INPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
 
   Serial.begin(115200);
 
@@ -359,15 +411,8 @@ void setup()
   delay(3000);
 
   setup_wifi();
-
-  client.setServer(MQTTSERVER, 1883);
-  client.setCallback(callback);
-  client.setKeepAlive(90);
-
-  if (!client.connected())
-  {
-    reconnect();
-  }
+  setup_MQTT();
+  setup_button();
 
   Serial.println("End setup... ");
 
@@ -375,7 +420,8 @@ void setup()
   delay(1000);
   ledsOFF();
 
-  digitalWrite(BUILTIN_LED, HIGH);
+  digitalWrite(GREEN, HIGH);
+  digitalWrite(BUILTIN_LED, LOW);
 }
 
 void loop()
@@ -384,7 +430,7 @@ void loop()
 
   Serial.print("connected status: ");
   Serial.println(client.connected());
-  delay(2000);
+  delay(100);
 
   if (!client.connected())
   {
@@ -392,8 +438,11 @@ void loop()
   }
   client.loop();
 
-  if (nextPage != currentPage)
-    showPage(nextPage);
+  button.tick();
 
+  if (nextPage != currentPage)
+  {
+    showPage(nextPage);
+  }
   delay(10000);
 }
