@@ -6,6 +6,7 @@
 #include <OneButton.h>
 #include <NTPClient.h>
 #include <Wire.h>
+#include <ESP32Time.h>
 
 // ------------------------------------------------------------------
 // Defines
@@ -45,10 +46,7 @@ LiquidCrystal_I2C lcd(0x3F, LCDCOLUMNS, LCDROWS);
 // // set LCD address, number of columns and rows
 // LiquidCrystal_I2C lcd(0x3F, LCDCOLUMNS, LCDROWS);
 
-const char *TZ_INFO = "GMT0GMT,M3.5.0/1,M10.5.0";
-
 WiFiUDP udp;
-NTPClient timeClient(udp);
 WiFiClient espClient;
 PubSubClient client(espClient);
 
@@ -71,6 +69,11 @@ char lcdLine[21];
 
 char displayPrice[] = "00.00";
 float price = atof((char *)displayPrice);
+
+const char *TZ_INFO = "GMT0GMT,M3.5.0/1,M10.5.0";
+NTPClient timeClient(udp, "pool.ntp.org", 0);
+ESP32Time rtc(0);
+String displayTime = "00:00:00";
 
 // ------------------------------------------------------------------------------
 //
@@ -173,6 +176,7 @@ void showPage(int reqPage)
     printToLCD("Page 2   ", 0, 0, 1);
     printToLCD("2", 0, 19, 0);
     printToLCD(BLANKLCDLINE, 3, 0, 0);
+    printToLCD("Love You!", 1, 5, 0);
     printToLCD(displayPrice, 3, 0, 0);
     printToLCD(colour, 3, 6, 0);
     break;
@@ -336,8 +340,43 @@ void setup_button()
   // button.attachLongPressStop(longClick);
 }
 
+void setup_timeClient()
+{
+  Serial.println("Getting NTP time...");
+  delay(1000);
+
+  timeClient.begin();
+  delay(100);
+
+  while (!timeClient.update())
+  {
+    timeClient.forceUpdate();
+  }
+
+  unsigned long epochTime = timeClient.getEpochTime();
+  rtc.setTime(epochTime);
+
+  Serial.print("RTC Time: ");
+  Serial.println(rtc.getTime());
+
+  delay(2000);
+}
+
+void getRTCTime()
+{
+  Serial.println("Getting RTC time...");
+
+  displayTime = rtc.getTime();
+
+  Serial.print("displayTime: ");
+  Serial.println(displayTime);
+
+  printToLCD((char*)displayTime.c_str(), 0, 9, 0);
+}
+
 void setup()
 {
+
   pinMode(YELLOW, OUTPUT);
   pinMode(RED, OUTPUT);
   pinMode(GREEN, OUTPUT);
@@ -359,6 +398,7 @@ void setup()
   setup_wifi();
   setup_MQTT();
   setup_button();
+  setup_timeClient();
 
   Serial.println("End setup... ");
 
@@ -374,6 +414,8 @@ void loop()
 {
   Serial.print("connected status: ");
   Serial.println(client.connected());
+
+  getRTCTime();
 
   if (!client.connected())
   {
