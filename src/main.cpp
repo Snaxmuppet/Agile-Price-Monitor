@@ -20,12 +20,12 @@
 #define strYELLOW "YELLOW"
 #define strGREEN "GREEN"
 
-#define scrButton 34
+#define scrButton 15
 #define pressed HIGH
 
 #define BLANKLCDLINE "                    "
 
-#define MAXPAGE 4
+#define MAXPAGE 2
 
 #define MSG_BUFFER_SIZE (50)
 
@@ -50,13 +50,13 @@ LiquidCrystal_I2C lcd(0x3F, LCDCOLUMNS, LCDROWS);
 
 // Node Red Time
 NodeRedTime nodeRedTime("http://192.168.1.45:1880/time/");
-const char *TZ_INFO = "GMT0BST,M3.5.0/1,M10.5.0";
+const char *TZ_INFO = "GMT0GMT,M3.5.0/1,M10.5.0";
 
 WiFiUDP udp;
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-OneButton button(scrButton, true);
+OneButton button(scrButton, true, true);
 
 // const char *SSID = "SnaxNet";
 // const char *PASSWORD = "snaxmuppet4481";
@@ -301,7 +301,8 @@ void getTime()
   Serial.println("getting time...");
 
   // fetch wallclock time as a seconds value
-  bool success = nodeRedTime.serverTime(&epochTime);
+  // bool success = nodeRedTime.serverTime(&epochTime);
+  bool success = false;
 
   // could time be obtained?
   if (success)
@@ -322,12 +323,12 @@ void getTime()
     //   Serial.printf("UTC: %s", asctime(&timeinfo));
     // }
 
-    strftime(sHour, 3, "%H", &timeinfo);
-    strftime(sMin, 3, "%M", &timeinfo);
+    // strftime(sHour, 3, "%H", &timeinfo);
+    // strftime(sMin, 3, "%M", &timeinfo);
 
-    strcpy(displayTime, sHour);
-    strcat(displayTime, ":");
-    strcat(displayTime, sMin);
+    // strcpy(displayTime, sHour);
+    // strcat(displayTime, ":");
+    // strcat(displayTime, sMin);
 
     Serial.print("displayTime: ");
     Serial.println(displayTime);
@@ -430,7 +431,6 @@ void loop()
 
   Serial.print("connected status: ");
   Serial.println(client.connected());
-  delay(100);
 
   if (!client.connected())
   {
@@ -444,5 +444,4 @@ void loop()
   {
     showPage(nextPage);
   }
-  delay(10000);
 }
