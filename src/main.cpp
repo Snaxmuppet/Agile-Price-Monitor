@@ -7,9 +7,26 @@
 #include <NTPClient.h>
 #include <Wire.h>
 #include <ESP32Time.h>
+#include <ArduinoJson.h>
 
 // ------------------------------------------------------------------
 // Defines
+//-------------------------------------------------------------------
+// Debugging
+//
+#define DEBUG 0
+
+#if DEBUG == 1
+#define debug(x) Serial.print(x)
+#define debugln(x) Serial.println(x)
+#define wait(x) delay(x)
+#else
+#define debug(x)
+#define debugln(x)
+#define wait(x)
+#endif
+
+//-------------------------------------------------------------------
 
 #define LCDCOLUMNS 20
 #define LCDROWS 4
@@ -47,8 +64,8 @@ LiquidCrystal_I2C lcd(0x3F, LCDCOLUMNS, LCDROWS);
 // LiquidCrystal_I2C lcd(0x3F, LCDCOLUMNS, LCDROWS);
 
 WiFiUDP udp;
-WiFiClient espClient;
-PubSubClient client(espClient);
+WiFiClient wifiClient;
+PubSubClient MQTTClient(wifiClient);
 
 OneButton button(scrButton, true, true);
 
@@ -60,6 +77,10 @@ const char *PASSWORD = "6yorkroad-iot";
 
 const char *MQTTSERVER = "192.168.1.45";
 const char *clientId = "ESP32AgilePriceMonitor";
+const char *subscribecurrentPeriodPrice = "agile/currentPeriodPrice";
+const char *subscribeperiodAvgMinPrices = "agile/periodAvgMinPrices";
+const char *subscribeperiodAvgStartTimes = "agile/periodAvgStartTimes";
+const char *subscribeAgile = "agile/*";
 
 unsigned long lastMsg = 0;
 
@@ -94,8 +115,8 @@ void ledsON()
 
 void priceReceived(float price)
 {
-  Serial.print("Price received = ");
-  Serial.println(price);
+  debug("Price received = ");
+  debugln(price);
 }
 
 void initLCD()
@@ -112,9 +133,9 @@ void printToLCD(char *text, int row, int column, bool clear)
   if (clear)
     lcd.clear();
 
-  Serial.print("Sending to LCD : >");
-  Serial.print(text);
-  Serial.println("<");
+  debug("Sending to LCD : >");
+  debug(text);
+  debugln("<");
 
   lcd.setCursor(column, row);
   lcd.print(text);
@@ -122,19 +143,19 @@ void printToLCD(char *text, int row, int column, bool clear)
 
 void setup_wifi()
 {
-  delay(100);
+  wait(100);
   digitalWrite(RED, HIGH);
 
   // We start by connecting to a WiFi network
 
-  Serial.print("Connecting to ");
-  Serial.println(SSID);
+  debug("Connecting to ");
+  debugln(SSID);
 
   strcpy(lcdLine, (char *)SSID);
   printToLCD("Wifi...", 0, 0, 1);
   printToLCD((char *)SSID, 1, 0, 0);
 
-  delay(1000);
+  wait(1000);
 
   WiFi.disconnect();
   WiFi.begin(SSID, PASSWORD);
@@ -142,21 +163,21 @@ void setup_wifi()
   while (WiFi.status() != WL_CONNECTED)
   {
     digitalWrite(RED, LOW);
-    delay(500);
-    Serial.print(".");
+    wait(500);
+    debug(".");
     digitalWrite(RED, HIGH);
-    delay(500);
+    wait(500);
   }
 
   randomSeed(micros());
 
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
+  debugln("");
+  debugln("WiFi connected");
+  debug("IP address: ");
+  debugln(WiFi.localIP());
   printToLCD("Good", 2, 0, 0);
 
-  delay(2000);
+  wait(2000);
 }
 
 void showPage(int reqPage)
@@ -188,45 +209,47 @@ void showPage(int reqPage)
 void reconnect()
 {
   digitalWrite(YELLOW, HIGH);
-  printToLCD("MQTT...", 0, 0, 1);
-  delay(500);
+  printToLCD("Connecting to MQTT...", 0, 0, 1);
+  wait(500);
+  int row = 0;
 
   // Loop until we're reconnected
-  while (!client.connected())
+  while (!MQTTClient.connected())
   {
     digitalWrite(YELLOW, LOW);
-    delay(500);
+    wait(500);
 
-    Serial.println("Attempting MQTT connection...");
-
-    printToLCD("MQTT...", 0, 0, 1);
-    delay(1000);
+    printToLCD(".", 1, row, 0);
+    wait(500);
 
     //  Attempt to connect
-    if (client.connect(clientId))
-    {
-      Serial.println("connected");
-      printToLCD("Good", 1, 0, 0);
-      delay(1000);
-
-      Serial.print("Subscribing to: ");
-      Serial.println(clientId);
-      delay(1000);
-
-      client.subscribe("agile/currentPeriodPrice");
-    }
-    else
-    {
-      Serial.print("failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
-      // Wait 5 seconds before retrying
-    }
+    MQTTClient.connect(clientId);
 
     digitalWrite(YELLOW, HIGH);
-    delay(500);
-    showPage(currentPage);
+
+    row++;
   }
+
+  // Must be connected
+  debugln("connected");
+  printToLCD("Good", 1, row, 0);
+  wait(1000);
+
+  debug("Subscribing to: ");
+  debugln(clientId);
+  wait(1000);
+
+  MQTTClient.subscribe(subscribecurrentPeriodPrice);
+  MQTTClient.subscribe(subscribeperiodAvgMinPrices);
+  MQTTClient.subscribe(subscribeperiodAvgStartTimes);
+
+  // MQTTClient.subscribe(subscribeAgile);
+  wait(100);
+
+  digitalWrite(YELLOW, HIGH);
+  wait(500);
+
+  showPage(currentPage);
 }
 
 void setLEDColour()
@@ -265,9 +288,9 @@ void initLEDS(int count, int gap)
   while (count > 0)
   {
     ledsON();
-    delay(gap);
+    wait(gap);
     ledsOFF();
-    delay(gap);
+    wait(gap);
     --count;
   }
 }
@@ -277,25 +300,45 @@ void callback(char *topic, byte *payload, unsigned int length)
 
   payload[length] = '\0';
 
-  price = atof((char *)payload);
-  dtostrf(price, 4, 2, displayPrice);
+  debug("Message arrived [");
+  debug(topic);
+  debugln("] ");
+  wait(1000);
 
-  Serial.print("Converted price: ");
-  Serial.println(price);
+  // check topic for the subscribed topic that has changed...
 
-  Serial.print("Message arrived [");
-  Serial.print(topic);
-  Serial.print("] ");
+  // agile/currentPeriodPrice
+  if (strcmp(topic, subscribecurrentPeriodPrice) == 0)
+  {
+    price = atof((char *)payload);
+    dtostrf(price, 4, 2, displayPrice);
 
-  Serial.print(displayPrice);
+    debug("Converted price: ");
+    debugln(price);
 
-  Serial.println();
+    debug(displayPrice);
 
-  initLEDS(60, 20);
-  setLEDColour();
+    debugln();
+    // wait(1000);
 
-  printToLCD(displayPrice, 3, 0, 0);
-  printToLCD(colour, 3, 6, 0);
+    initLEDS(60, 20);
+    setLEDColour();
+
+    printToLCD(displayPrice, 3, 0, 0);
+    printToLCD(colour, 3, 6, 0);
+  }
+
+  // agile/periodAvgMinPrices
+  if (strcmp(topic, subscribeperiodAvgMinPrices) == 0)
+  {
+    ;
+  }
+
+  // agile/periodAvgStartTimes
+  if (strcmp(topic, subscribeperiodAvgStartTimes) == 0)
+  {
+    ;
+  }
 }
 
 void selectNextPage(int reqPage)
@@ -314,11 +357,13 @@ void setup_MQTT()
 {
   digitalWrite(YELLOW, HIGH);
 
-  client.setServer(MQTTSERVER, 1883);
-  client.setCallback(callback);
-  client.setKeepAlive(90);
+  MQTTClient.disconnect();
 
-  if (!client.connected())
+  MQTTClient.setKeepAlive(90);
+  MQTTClient.setServer(MQTTSERVER, 1883);
+  MQTTClient.setCallback(callback);
+
+  if (!MQTTClient.connected())
   {
     reconnect();
   }
@@ -327,8 +372,8 @@ void setup_MQTT()
 
 void singleClick()
 {
-  Serial.println("Single Click");
-  delay(2000);
+  debugln("Single Click");
+  wait(2000);
 
   selectNextPage(0);
 }
@@ -342,11 +387,11 @@ void setup_button()
 
 void setup_timeClient()
 {
-  Serial.println("Getting NTP time...");
-  delay(1000);
+  debugln("Getting NTP time...");
+  wait(1000);
 
   timeClient.begin();
-  delay(100);
+  wait(100);
 
   while (!timeClient.update())
   {
@@ -356,22 +401,22 @@ void setup_timeClient()
   unsigned long epochTime = timeClient.getEpochTime();
   rtc.setTime(epochTime);
 
-  Serial.print("RTC Time: ");
-  Serial.println(rtc.getTime());
+  debug("RTC Time: ");
+  debugln(rtc.getTime());
 
-  delay(2000);
+  wait(2000);
 }
 
 void getRTCTime()
 {
-  Serial.println("Getting RTC time...");
+  debugln("Getting RTC time...");
 
   displayTime = rtc.getTime();
 
-  Serial.print("displayTime: ");
-  Serial.println(displayTime);
+  debug("displayTime: ");
+  debugln(displayTime);
 
-  printToLCD((char*)displayTime.c_str(), 0, 9, 0);
+  printToLCD((char *)displayTime.c_str(), 0, 9, 0);
 }
 
 void setup()
@@ -384,13 +429,13 @@ void setup()
 
   Serial.begin(115200);
 
-  delay(1000);
+  wait(1000);
 
   initLCD();
 
   initLEDS(5, 100);
 
-  Serial.println("Start setup... ");
+  debugln("Start setup... ");
 
   strcpy(lcdLine, "Start...");
   printToLCD(lcdLine, 0, 0, 1);
@@ -400,10 +445,10 @@ void setup()
   setup_button();
   setup_timeClient();
 
-  Serial.println("End setup... ");
+  debugln("End setup... ");
 
   ledsON();
-  delay(1000);
+  wait(1000);
   ledsOFF();
 
   digitalWrite(GREEN, HIGH);
@@ -412,16 +457,16 @@ void setup()
 
 void loop()
 {
-  Serial.print("connected status: ");
-  Serial.println(client.connected());
+  debug("MQTT connected status: ");
+  debugln(MQTTClient.connected());
 
   getRTCTime();
 
-  if (!client.connected())
+  if (!MQTTClient.connected())
   {
     reconnect();
   }
-  client.loop();
+  MQTTClient.loop();
 
   button.tick();
 
