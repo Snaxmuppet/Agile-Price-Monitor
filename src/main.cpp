@@ -72,15 +72,17 @@ OneButton button(scrButton, true, true);
 // const char *SSID = "SnaxNet";
 // const char *PASSWORD = "snaxmuppet4481";
 
-const char *SSID = "SnaxNet-IoT";
-const char *PASSWORD = "6yorkroad-iot";
+char SSID[] = "SnaxNet-IoT";
+char PASSWORD[] = "6yorkroad-iot";
+IPAddress local_ip;
+char ipAddress[] = "000.000.000.000";
 
-const char *MQTTSERVER = "192.168.1.45";
-const char *clientId = "ESP32AgilePriceMonitor";
-const char *subscribecurrentPeriodPrice = "agile/currentPeriodPrice";
-const char *subscribeperiodAvgMinPrices = "agile/periodAvgMinPrices";
-const char *subscribeperiodAvgStartTimes = "agile/periodAvgStartTimes";
-const char *subscribeAgile = "agile/*";
+char MQTTSERVER[] = "192.168.1.45";
+char clientId[] = "ESP32AgilePriceMonitor";
+char subscribecurrentPeriodPrice[] = "agile/currentPeriodPrice";
+char subscribeperiodAvgMinPrices[] = "agile/periodAvgMinPrices";
+char subscribeperiodAvgStartTimes[] = "agile/periodAvgStartTimes";
+char subscribeAgile[] = "agile/*";
 
 unsigned long lastMsg = 0;
 
@@ -91,10 +93,10 @@ char lcdLine[21];
 char displayPrice[] = "00.00";
 float price = atof((char *)displayPrice);
 
-const char *TZ_INFO = "GMT0GMT,M3.5.0/1,M10.5.0";
+char TZ_INFO[] = "GMT0GMT,M3.5.0/1,M10.5.0";
 NTPClient timeClient(udp, "pool.ntp.org", 0);
 ESP32Time rtc(0);
-String displayTime = "00:00:00";
+char displayTime[] = "00:00:00";
 
 // ------------------------------------------------------------------------------
 //
@@ -128,7 +130,7 @@ void initLCD()
   Wire.setClock(10000);
 }
 
-void printToLCD(char *text, int row, int column, bool clear)
+void printToLCD(char text[], int row, int column, bool clear)
 {
   if (clear)
     lcd.clear();
@@ -139,6 +141,15 @@ void printToLCD(char *text, int row, int column, bool clear)
 
   lcd.setCursor(column, row);
   lcd.print(text);
+}
+
+void getLocalIP(IPAddress IP)
+{
+  uint32_t ip_addr = (uint32_t)IP;
+  IPAddress _ip;
+  _ip = ip_addr;
+
+  snprintf(ipAddress, 16, "%d.%d.%d.%d", _ip[0], _ip[1], _ip[2], _ip[3]);
 }
 
 void setup_wifi()
@@ -152,10 +163,9 @@ void setup_wifi()
   debugln(SSID);
 
   strcpy(lcdLine, (char *)SSID);
-  printToLCD("Wifi...", 0, 0, 1);
-  printToLCD((char *)SSID, 1, 0, 0);
-
-  wait(1000);
+  printToLCD((char *)"Wifi...", 0, 0, 1);
+  printToLCD(lcdLine, 1, 0, 0);
+  delay(2000);
 
   WiFi.disconnect();
   WiFi.begin(SSID, PASSWORD);
@@ -169,15 +179,17 @@ void setup_wifi()
     wait(500);
   }
 
-  randomSeed(micros());
-
   debugln("");
   debugln("WiFi connected");
   debug("IP address: ");
   debugln(WiFi.localIP());
-  printToLCD("Good", 2, 0, 0);
 
-  wait(2000);
+  local_ip = WiFi.localIP();
+  getLocalIP(local_ip);
+
+  printToLCD((char *)"Good: IP Address: ", 2, 0, 0);
+  printToLCD(ipAddress, 3, 0, 0);
+  delay(3000);
 }
 
 void showPage(int reqPage)
@@ -185,19 +197,19 @@ void showPage(int reqPage)
   switch (reqPage)
   {
   case 1:
-    printToLCD("Running", 0, 0, 1);
-    printToLCD("1", 0, 19, 0);
-    printToLCD(BLANKLCDLINE, 3, 0, 0);
+    printToLCD((char *)"Running", 0, 0, 1);
+    printToLCD((char *)"1", 0, 19, 0);
+    printToLCD((char *)BLANKLCDLINE, 3, 0, 0);
     printToLCD(displayPrice, 3, 0, 0);
     printToLCD(colour, 3, 6, 0);
     break;
 
   case 2:
 
-    printToLCD("Page 2   ", 0, 0, 1);
-    printToLCD("2", 0, 19, 0);
-    printToLCD(BLANKLCDLINE, 3, 0, 0);
-    printToLCD("Love You!", 1, 5, 0);
+    printToLCD((char *)"Page 2   ", 0, 0, 1);
+    printToLCD((char *)"2", 0, 19, 0);
+    printToLCD((char *)BLANKLCDLINE, 3, 0, 0);
+    printToLCD((char *)"Love You!", 1, 5, 0);
     printToLCD(displayPrice, 3, 0, 0);
     printToLCD(colour, 3, 6, 0);
     break;
@@ -209,7 +221,7 @@ void showPage(int reqPage)
 void reconnect()
 {
   digitalWrite(YELLOW, HIGH);
-  printToLCD("Connecting to MQTT...", 0, 0, 1);
+  printToLCD((char *)"Connecting to MQTT...", 0, 0, 1);
   wait(500);
   int row = 0;
 
@@ -219,7 +231,7 @@ void reconnect()
     digitalWrite(YELLOW, LOW);
     wait(500);
 
-    printToLCD(".", 1, row, 0);
+    printToLCD((char *)".", 1, row, 0);
     wait(500);
 
     //  Attempt to connect
@@ -232,7 +244,7 @@ void reconnect()
 
   // Must be connected
   debugln("connected");
-  printToLCD("Good", 1, row, 0);
+  printToLCD((char *)"Good", 1, row, 0);
   wait(1000);
 
   debug("Subscribing to: ");
@@ -315,11 +327,9 @@ void callback(char *topic, byte *payload, unsigned int length)
 
     debug("Converted price: ");
     debugln(price);
-
     debug(displayPrice);
-
     debugln();
-    // wait(1000);
+    wait(1000);
 
     initLEDS(60, 20);
     setLEDColour();
@@ -404,19 +414,13 @@ void setup_timeClient()
   debug("RTC Time: ");
   debugln(rtc.getTime());
 
-  wait(2000);
+  delay(3000);
 }
 
 void getRTCTime()
 {
-  debugln("Getting RTC time...");
-
-  displayTime = rtc.getTime();
-
-  debug("displayTime: ");
-  debugln(displayTime);
-
-  printToLCD((char *)displayTime.c_str(), 0, 9, 0);
+  // displayTime = rtc.getTime();
+  // printToLCD((char *)displayTime, 0, 9, 0);
 }
 
 void setup()
@@ -428,8 +432,7 @@ void setup()
   pinMode(LED_BUILTIN, OUTPUT);
 
   Serial.begin(115200);
-
-  wait(1000);
+  delay(100);
 
   initLCD();
 
