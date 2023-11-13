@@ -244,18 +244,12 @@ void reconnect()
 
   // Must be connected
   debugln("connected");
-  printToLCD((char *)"Good", 1, row, 0);
-  wait(1000);
-
-  debug("Subscribing to: ");
-  debugln(clientId);
+  printToLCD((char *)"Good", 1, 0, 0);
   wait(1000);
 
   MQTTClient.subscribe(subscribecurrentPeriodPrice);
   MQTTClient.subscribe(subscribeperiodAvgMinPrices);
   MQTTClient.subscribe(subscribeperiodAvgStartTimes);
-
-  // MQTTClient.subscribe(subscribeAgile);
   wait(100);
 
   digitalWrite(YELLOW, HIGH);
