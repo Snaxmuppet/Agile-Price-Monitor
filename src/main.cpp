@@ -96,7 +96,7 @@ float price = atof((char *)displayPrice);
 char TZ_INFO[] = "GMT0GMT,M3.5.0/1,M10.5.0";
 NTPClient timeClient(udp, "pool.ntp.org", 0);
 ESP32Time rtc(0);
-char displayTime[] = "00:00:00";
+char displayTime[9] = "00:00:00";
 
 // ------------------------------------------------------------------------------
 //
@@ -419,8 +419,12 @@ void setup_timeClient()
 
 void getRTCTime()
 {
-  // displayTime = rtc.getTime();
-  // printToLCD((char *)displayTime, 0, 9, 0);
+  int Hr =rtc.getHour();
+  int Min =rtc.getMinute();
+  int Sec =rtc.getSecond();
+  
+  snprintf(displayTime, 16, "%02i:%02i:%02i", Hr, Min, Sec);
+  printToLCD((char *)displayTime, 0, 9, 0);
 }
 
 void setup()
