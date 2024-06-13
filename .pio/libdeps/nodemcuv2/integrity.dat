@@ -1,0 +1,7 @@
+marcoschwartz/LiquidCrystal_I2C@^1.1.4
+thijse/ArduinoLog@^1.1.1
+bblanchon/ArduinoJson@^6.21.3
+knolleary/PubSubClient@^2.8
+arduino-libraries/NTPClient@^3.2.1
+mathertel/OneButton@^2.0.3
+fbiego/ESP32Time@^2.0.4

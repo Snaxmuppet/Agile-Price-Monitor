@@ -78,11 +78,11 @@ IPAddress local_ip;
 char ipAddress[] = "000.000.000.000";
 
 char MQTTSERVER[] = "192.168.1.45";
-char clientId[] = "ESP32AgilePriceMonitor";
+char clientId[] = "ESP32AgilePriceMonitor1";
 char subscribecurrentPeriodPrice[] = "agile/currentPeriodPrice";
 char subscribeperiodAvgMinPrices[] = "agile/periodAvgMinPrices";
-char subscribeperiodAvgStartTimes[] = "agile/periodAvgStartTimes";
-char subscribeAgile[] = "agile/*";
+char subscribeperiodAvgStrtTimes[] = "agile/periodAvgStrtTimes";
+char subscribeAgile[] = "agile/#";
 
 unsigned long lastMsg = 0;
 
@@ -135,9 +135,9 @@ void printToLCD(char text[], int row, int column, bool clear)
   if (clear)
     lcd.clear();
 
-  debug("Sending to LCD : >");
-  debug(text);
-  debugln("<");
+  // debug("Sending to LCD : >");
+  // debug(text);
+  // debugln("<");
 
   lcd.setCursor(column, row);
   lcd.print(text);
@@ -247,10 +247,12 @@ void reconnect()
   printToLCD((char *)"Good", 1, 0, 0);
   wait(1000);
 
-  MQTTClient.subscribe(subscribecurrentPeriodPrice);
-  MQTTClient.subscribe(subscribeperiodAvgMinPrices);
-  MQTTClient.subscribe(subscribeperiodAvgStartTimes);
-  wait(100);
+  if (!MQTTClient.subscribe(subscribeAgile))
+  {
+    Serial.println("subscribeAgile Not Subscribed");
+  }
+
+  delay(100);
 
   digitalWrite(YELLOW, HIGH);
   wait(500);
@@ -333,15 +335,19 @@ void callback(char *topic, byte *payload, unsigned int length)
   }
 
   // agile/periodAvgMinPrices
-  if (strcmp(topic, subscribeperiodAvgMinPrices) == 0)
-  {
-    ;
-  }
+  // if (strcmp(topic, subscribeperiodAvgMinPrices) == 0)
+  // {
+  //   printToLCD((char *)"Rec. Avg Min Prices", 2, 0, 0);
+  //   delay(1000);
+  //   printToLCD((char *)BLANKLCDLINE, 2, 0, 0);
+  // }
 
   // agile/periodAvgStartTimes
-  if (strcmp(topic, subscribeperiodAvgStartTimes) == 0)
+  if (strcmp(topic, subscribeperiodAvgStrtTimes) == 0)
   {
-    ;
+    printToLCD((char *)"Rec.Avg Start Times", 2, 0, 0);
+    delay(1000);
+    printToLCD((char *)BLANKLCDLINE, 2, 0, 0);
   }
 }
 
@@ -413,10 +419,10 @@ void setup_timeClient()
 
 void getRTCTime()
 {
-  int Hr =rtc.getHour();
-  int Min =rtc.getMinute();
-  int Sec =rtc.getSecond();
-  
+  int Hr = rtc.getHour(true);
+  int Min = rtc.getMinute();
+  int Sec = rtc.getSecond();
+
   snprintf(displayTime, 16, "%02i:%02i:%02i", Hr, Min, Sec);
   printToLCD((char *)displayTime, 0, 9, 0);
 }
@@ -430,7 +436,7 @@ void setup()
   pinMode(LED_BUILTIN, OUTPUT);
 
   Serial.begin(115200);
-  delay(100);
+  delay(1000);
 
   initLCD();
 
@@ -458,16 +464,15 @@ void setup()
 
 void loop()
 {
-  debug("MQTT connected status: ");
-  debugln(MQTTClient.connected());
+  // debug("MQTT connected status: ");
+  // debugln(MQTTClient.connected());
 
   getRTCTime();
 
-  if (!MQTTClient.connected())
+  while (!MQTTClient.loop())
   {
     reconnect();
   }
-  MQTTClient.loop();
 
   button.tick();
 
